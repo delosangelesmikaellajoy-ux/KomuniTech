@@ -325,6 +325,37 @@ class DocumentRequestController extends Controller
         return back()->withErrors('Unsupported format requested.');
     }
 
+    public function editGenerated(DocumentRequest $documentRequest)
+    {
+        abort_unless($documentRequest->status === 'Approved', 403);
+        abort_unless($documentRequest->barangay === Auth::user()->barangay, 403);
+
+        $generated = $documentRequest->generatedDocument;
+        $htmlContent = $generated?->html_content ?? $this->generateFinalDocumentHtml($documentRequest);
+
+        return view('admin.document_requests.edit', compact('documentRequest', 'htmlContent'));
+    }
+
+    public function updateGenerated(Request $request, DocumentRequest $documentRequest)
+    {
+        abort_unless($documentRequest->status === 'Approved', 403);
+        abort_unless($documentRequest->barangay === Auth::user()->barangay, 403);
+
+        $request->validate([
+            'html_content' => 'required|string',
+        ]);
+
+        $documentRequest->generatedDocument()->updateOrCreate([
+            'document_request_id' => $documentRequest->id,
+        ], [
+            'document_type_id' => $documentRequest->document_type_id,
+            'html_content' => $request->html_content,
+        ]);
+
+        return redirect()->route('admin.document_requests.index')
+            ->with('success', 'Document updated successfully.');
+    }
+
     protected function generateFinalDocumentHtml(DocumentRequest $documentRequest): string
     {
         $template = $documentRequest->documentType?->effective_template_html;

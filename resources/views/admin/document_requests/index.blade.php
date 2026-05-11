@@ -3,12 +3,26 @@
 
 @section('header')
     <header class="bg-gradient-to-r from-primary-50 to-primary-100 border-b border-primary-200">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <h1 class="text-4xl font-bold text-primary-900 flex items-center gap-3">
-                <i class="fas fa-hourglass-half text-primary-600 text-3xl"></i>
-                Manage Document Requests
-            </h1>
-            <p class="text-primary-700 mt-2">Review and approve pending requests from citizens</p>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                    <h1 class="text-3xl sm:text-4xl font-bold text-primary-900 flex items-center gap-3">
+                        <i class="fas fa-hourglass-half text-primary-600 text-2xl sm:text-3xl"></i>
+                        <span class="leading-tight">Manage Document Requests</span>
+                    </h1>
+                    <p class="text-primary-700 mt-2 text-base sm:text-lg">Review and approve pending requests from citizens</p>
+                </div>
+                <div class="flex items-center gap-4 sm:gap-6">
+                    <div class="text-center">
+                        <div class="text-xs sm:text-sm text-primary-600">Total Requests</div>
+                        <div class="text-xl sm:text-2xl font-bold text-primary-900">{{ $pendingRequests->count() + $approvedRequests->count() + $rejectedRequests->count() }}</div>
+                    </div>
+                    <div class="text-center">
+                        <div class="text-xs sm:text-sm text-primary-600">Pending</div>
+                        <div class="text-xl sm:text-2xl font-bold text-warning-600">{{ $pendingRequests->count() }}</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </header>
 @endsection
@@ -29,6 +43,40 @@
             {{ $errors->first() }}
         </x-alert>
     @endif
+
+    {{-- Quick Stats Bar --}}
+    <div class="bg-white rounded-xl shadow-sm border border-neutral-200 p-6 mb-8">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
+            <div class="text-center">
+                <div class="inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-warning-100 rounded-full mb-2">
+                    <i class="fas fa-clock text-warning-600 text-lg sm:text-xl"></i>
+                </div>
+                <div class="text-xl sm:text-2xl font-bold text-neutral-900">{{ $pendingRequests->count() }}</div>
+                <div class="text-xs sm:text-sm text-neutral-600">Pending</div>
+            </div>
+            <div class="text-center">
+                <div class="inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-success-100 rounded-full mb-2">
+                    <i class="fas fa-check-circle text-success-600 text-lg sm:text-xl"></i>
+                </div>
+                <div class="text-xl sm:text-2xl font-bold text-neutral-900">{{ $approvedRequests->count() }}</div>
+                <div class="text-xs sm:text-sm text-neutral-600">Approved</div>
+            </div>
+            <div class="text-center">
+                <div class="inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-error-100 rounded-full mb-2">
+                    <i class="fas fa-times-circle text-error-600 text-lg sm:text-xl"></i>
+                </div>
+                <div class="text-xl sm:text-2xl font-bold text-neutral-900">{{ $rejectedRequests->count() }}</div>
+                <div class="text-xs sm:text-sm text-neutral-600">Rejected</div>
+            </div>
+            <div class="text-center">
+                <div class="inline-flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 bg-primary-100 rounded-full mb-2">
+                    <i class="fas fa-file-alt text-primary-600 text-lg sm:text-xl"></i>
+                </div>
+                <div class="text-xl sm:text-2xl font-bold text-neutral-900">{{ $pendingRequests->count() + $approvedRequests->count() + $rejectedRequests->count() }}</div>
+                <div class="text-xs sm:text-sm text-neutral-600">Total</div>
+            </div>
+        </div>
+    </div>
 
     {{-- Use controller-provided, status-specific datasets --}}
     @php
@@ -223,6 +271,9 @@
                                     </td>
                                     <td class="px-4 py-3">
                                         <div class="flex gap-1 flex-wrap">
+                                            <a href="{{ route('admin.document_requests.edit', $req->id) }}" class="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium hover:bg-blue-200 transition" title="Edit document">
+                                                <i class="fas fa-edit"></i>Edit
+                                            </a>
                                             <a href="{{ route('admin.document_requests.preview', $req->id) }}" target="_blank" class="inline-flex items-center gap-1 px-2 py-1 bg-primary-100 text-primary-700 rounded text-xs font-medium hover:bg-primary-200 transition" title="Preview document">
                                                 <i class="fas fa-eye"></i>Preview
                                             </a>

@@ -117,6 +117,10 @@ Route::middleware(['auth', 'role:' . User::ROLE_ADMIN])->group(function () {
         ]);
 
         // Document Request Preview and Download
+        Route::get('/admin/document-requests/{documentRequest}/edit', [DocumentRequestController::class, 'editGenerated'])
+            ->name('admin.document_requests.edit');
+        Route::post('/admin/document-requests/{documentRequest}/edit', [DocumentRequestController::class, 'updateGenerated'])
+            ->name('admin.document_requests.update_generated');
         Route::get('/admin/document-requests/{documentRequest}/preview', [DocumentRequestController::class, 'previewGenerated'])
             ->name('admin.document_requests.preview');
         Route::get('/admin/document-requests/{documentRequest}/download/{format}', [DocumentRequestController::class, 'downloadGenerated'])

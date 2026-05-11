@@ -29,59 +29,29 @@ class DocumentTypeController extends Controller
 
     public function store(Request $request)
     {
-        $allowedExtensions = ['doc', 'docx', 'pdf', 'xls', 'xlsx'];
-
         $request->validate([
             'name' => 'required|string|max:255',
             'base_price' => 'required|numeric|min:0',
-            'template_file' => 'nullable|file|mimes:doc,docx,pdf,xls,xlsx|max:20480',
-            'template_mode' => 'required|in:word,pdf,spreadsheet',
-            'editable_template_content' => 'nullable|string',
-            'template_html' => 'nullable|string',
             'is_active' => 'boolean',
         ]);
 
-        $templateFile = null;
-        $templateFileType = null;
-        $templateFileName = null;
-        $templateFileMime = null;
-        $templateFileSize = null;
+        // Check for duplicate name within the same barangay
+        $existing = DocumentType::where('barangay', Auth::user()->barangay)
+            ->where('name', $request->name)
+            ->first();
 
-        if ($request->hasFile('template_file')) {
-            $uploadedFile = $request->file('template_file');
-            $templateFileType = strtolower($uploadedFile->extension());
-
-            abort_unless(in_array($templateFileType, $allowedExtensions, true), 422, 'Unsupported template file type.');
-
-            $safeBaseName = Str::slug($request->name ?: 'document-template');
-            $fileName = $safeBaseName . '-' . Str::random(10) . '.' . $templateFileType;
-            $templateFile = $uploadedFile->storeAs(
-                'document_templates/' . Auth::id(),
-                $fileName,
-                'public'
-            );
-
-            $templateFileName = $uploadedFile->getClientOriginalName();
-            $templateFileMime = $uploadedFile->getMimeType();
-            $templateFileSize = $uploadedFile->getSize();
+        if ($existing) {
+            return back()->withInput()->withErrors([
+                'name' => 'A document type with this name already exists for your barangay.'
+            ]);
         }
-
-        $editableTemplateContent = $request->input('editable_template_content')
-            ?: $request->input('template_html')
-            ?: $this->getDefaultTemplate($request->name);
 
         DocumentType::create([
             'name' => $request->name,
             'base_price' => $request->base_price,
-            'template_html' => $editableTemplateContent,
-            'template_file_path' => $templateFile,
-            'template_file_name' => $templateFileName,
-            'template_file_mime' => $templateFileMime,
-            'template_file_type' => $templateFileType,
-            'template_file_size' => $templateFileSize,
-            'editable_template_content' => $editableTemplateContent,
             'is_active' => $request->has('is_active'),
             'barangay' => Auth::user()->barangay,
+            'template_html' => '<h1>' . e($request->name) . '</h1><p>Document for: {{ fullname }}</p><p>Address: {{ address }}</p><p>Purpose: {{ purpose }}</p><p>Release Date: {{ release_date }}</p>',
         ]);
 
         return redirect()->route('admin.document_types.index')->with('success', 'Document type created successfully.');
@@ -108,6 +78,18 @@ class DocumentTypeController extends Controller
             'template_html' => 'nullable|string',
             'is_active' => 'boolean',
         ]);
+
+        // Check for duplicate name within the same barangay (excluding current document type)
+        $existing = DocumentType::where('barangay', Auth::user()->barangay)
+            ->where('name', $request->name)
+            ->where('id', '!=', $documentType->id)
+            ->first();
+
+        if ($existing) {
+            return back()->withInput()->withErrors([
+                'name' => 'A document type with this name already exists for your barangay.'
+            ]);
+        }
 
         $templateFileData = [
             'template_file_path' => $documentType->template_file_path,

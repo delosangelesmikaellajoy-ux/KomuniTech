@@ -33,15 +33,17 @@ class RegisteredUserController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
-            'barangay' => ['required', 'string', 'max:255'],
+            'barangay' => ['nullable', 'string', 'max:255'],
         ]);
+
+        $barangay = $request->filled('barangay') ? $request->barangay : User::DEFAULT_BARANGAY;
 
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'role' => User::ROLE_USER, // default role for regular residents
-            'barangay' => $request->barangay,
+            'barangay' => $barangay,
         ]);
 
         event(new Registered($user));

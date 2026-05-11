@@ -17,10 +17,12 @@
         </div>
 
         <!-- Barangay -->
+        @php $defaultBarangay = \App\Models\User::DEFAULT_BARANGAY; @endphp
         <div class="mt-4">
             <x-input-label for="barangay" :value="__('Barangay')" />
-            <x-text-input id="barangay" class="block mt-1 w-full" type="text" name="barangay" :value="old('barangay')" required autocomplete="organization" />
+            <x-text-input id="barangay" class="block mt-1 w-full" type="text" name="barangay" :value="old('barangay', $defaultBarangay)" required autocomplete="organization" />
             <x-input-error :messages="$errors->get('barangay')" class="mt-2" />
+            <p class="text-sm text-gray-500 mt-2">Default barangay is {{ $defaultBarangay }}, but you may enter another barangay if applicable.</p>
         </div>
 
         <!-- Password -->

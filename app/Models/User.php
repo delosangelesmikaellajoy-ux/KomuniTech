@@ -16,6 +16,7 @@ class User extends Authenticatable
     public const ROLE_USER = 'user';
     public const ROLE_ADMIN = 'admin';
     public const ROLE_ADMINISTRATOR = 'administrator';
+    public const DEFAULT_BARANGAY = 'Barangay Bayuin, Socorro, Oriental Mindoro';
 
     // Convenience helper methods to check roles
     // ROLE_ADMINISTRATOR is the system owner with global configuration access.
@@ -38,6 +39,21 @@ class User extends Authenticatable
     public function isSeeder(): bool
     {
         return $this->is_seeder === true;
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $user): void {
+            if (empty($user->barangay)) {
+                $user->barangay = self::DEFAULT_BARANGAY;
+            }
+        });
+
+        static::saving(function (self $user): void {
+            if (empty($user->barangay)) {
+                $user->barangay = self::DEFAULT_BARANGAY;
+            }
+        });
     }
 
     public function subscription()
