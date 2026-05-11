@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\DocumentType;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class DocumentTypeController extends Controller
 {
@@ -16,22 +18,68 @@ class DocumentTypeController extends Controller
 
     public function create()
     {
-        return view('admin.document_types.create');
+        return view('admin.document_types.create', [
+            'documentType' => new DocumentType([
+                'template_html' => $this->getDefaultTemplate('Document Type'),
+                'editable_template_content' => $this->getDefaultTemplate('Document Type'),
+                'template_file_type' => 'docx',
+            ]),
+        ]);
     }
 
     public function store(Request $request)
     {
+        $allowedExtensions = ['doc', 'docx', 'pdf', 'xls', 'xlsx'];
+
         $request->validate([
             'name' => 'required|string|max:255',
             'base_price' => 'required|numeric|min:0',
+            'template_file' => 'nullable|file|mimes:doc,docx,pdf,xls,xlsx|max:20480',
+            'template_mode' => 'required|in:word,pdf,spreadsheet',
+            'editable_template_content' => 'nullable|string',
             'template_html' => 'nullable|string',
             'is_active' => 'boolean',
         ]);
 
+        $templateFile = null;
+        $templateFileType = null;
+        $templateFileName = null;
+        $templateFileMime = null;
+        $templateFileSize = null;
+
+        if ($request->hasFile('template_file')) {
+            $uploadedFile = $request->file('template_file');
+            $templateFileType = strtolower($uploadedFile->extension());
+
+            abort_unless(in_array($templateFileType, $allowedExtensions, true), 422, 'Unsupported template file type.');
+
+            $safeBaseName = Str::slug($request->name ?: 'document-template');
+            $fileName = $safeBaseName . '-' . Str::random(10) . '.' . $templateFileType;
+            $templateFile = $uploadedFile->storeAs(
+                'document_templates/' . Auth::id(),
+                $fileName,
+                'public'
+            );
+
+            $templateFileName = $uploadedFile->getClientOriginalName();
+            $templateFileMime = $uploadedFile->getMimeType();
+            $templateFileSize = $uploadedFile->getSize();
+        }
+
+        $editableTemplateContent = $request->input('editable_template_content')
+            ?: $request->input('template_html')
+            ?: $this->getDefaultTemplate($request->name);
+
         DocumentType::create([
             'name' => $request->name,
             'base_price' => $request->base_price,
-            'template_html' => $request->template_html ?: $this->getDefaultTemplate($request->name),
+            'template_html' => $editableTemplateContent,
+            'template_file_path' => $templateFile,
+            'template_file_name' => $templateFileName,
+            'template_file_mime' => $templateFileMime,
+            'template_file_type' => $templateFileType,
+            'template_file_size' => $templateFileSize,
+            'editable_template_content' => $editableTemplateContent,
             'is_active' => $request->has('is_active'),
             'barangay' => Auth::user()->barangay,
         ]);
@@ -49,17 +97,59 @@ class DocumentTypeController extends Controller
     {
         abort_unless($documentType->barangay === Auth::user()->barangay, 403);
 
+        $allowedExtensions = ['doc', 'docx', 'pdf', 'xls', 'xlsx'];
+
         $request->validate([
             'name' => 'required|string|max:255',
             'base_price' => 'required|numeric|min:0',
+            'template_file' => 'nullable|file|mimes:doc,docx,pdf,xls,xlsx|max:20480',
+            'template_mode' => 'required|in:word,pdf,spreadsheet',
+            'editable_template_content' => 'nullable|string',
             'template_html' => 'nullable|string',
             'is_active' => 'boolean',
         ]);
 
+        $templateFileData = [
+            'template_file_path' => $documentType->template_file_path,
+            'template_file_name' => $documentType->template_file_name,
+            'template_file_mime' => $documentType->template_file_mime,
+            'template_file_type' => $documentType->template_file_type,
+            'template_file_size' => $documentType->template_file_size,
+        ];
+
+        if ($request->hasFile('template_file')) {
+            if ($documentType->template_file_path) {
+                Storage::disk('public')->delete($documentType->template_file_path);
+            }
+
+            $uploadedFile = $request->file('template_file');
+            $templateFileType = strtolower($uploadedFile->extension());
+
+            abort_unless(in_array($templateFileType, $allowedExtensions, true), 422, 'Unsupported template file type.');
+
+            $safeBaseName = Str::slug($request->name ?: 'document-template');
+            $fileName = $safeBaseName . '-' . Str::random(10) . '.' . $templateFileType;
+
+            $templateFileData = [
+                'template_file_path' => $uploadedFile->storeAs('document_templates/' . Auth::id(), $fileName, 'public'),
+                'template_file_name' => $uploadedFile->getClientOriginalName(),
+                'template_file_mime' => $uploadedFile->getMimeType(),
+                'template_file_type' => $templateFileType,
+                'template_file_size' => $uploadedFile->getSize(),
+            ];
+        }
+
+        $editableTemplateContent = $request->input('editable_template_content')
+            ?: $request->input('template_html')
+            ?: $documentType->editable_template_content
+            ?: $this->getDefaultTemplate($request->name);
+
         $documentType->update([
             'name' => $request->name,
             'base_price' => $request->base_price,
-            'template_html' => $request->template_html ?: $this->getDefaultTemplate($request->name),
+            'template_html' => $editableTemplateContent,
+            'editable_template_content' => $editableTemplateContent,
+            ...$templateFileData,
             'is_active' => $request->has('is_active'),
         ]);
 
@@ -69,22 +159,17 @@ class DocumentTypeController extends Controller
     public function destroy(DocumentType $documentType)
     {
         abort_unless($documentType->barangay === Auth::user()->barangay, 403);
+
+        if ($documentType->template_file_path) {
+            Storage::disk('public')->delete($documentType->template_file_path);
+        }
+
         $documentType->delete();
         return redirect()->route('admin.document_types.index')->with('success', 'Document type deleted successfully.');
     }
 
     protected function getDefaultTemplate(string $name): string
     {
-        return "<h1>{$name}</h1>
-<p><strong>Full Name:</strong> {{ fullname }}</p>
-<p><strong>Date of Birth:</strong> {{ dob }}</p>
-<p><strong>Sex:</strong> {{ sex }}</p>
-<p><strong>Civil Status:</strong> {{ civil_status }}</p>
-<p><strong>Address:</strong> {{ address }}</p>
-<p><strong>Barangay:</strong> {{ barangay }}</p>
-<p><strong>Purpose:</strong> {{ purpose }}</p>
-<p><strong>ID Presented:</strong> {{ id_presented }}</p>
-<p><strong>Contact Number:</strong> {{ contact_number }}</p>
-<p><strong>Release Date:</strong> {{ release_date }}</p>";
+        return "<div style=\"font-family: Arial, sans-serif; line-height: 1.6;\">\n<h1>{$name}</h1>\n<p><strong>Full Name:</strong> {{ fullname }}</p>\n<p><strong>Date of Birth:</strong> {{ dob }}</p>\n<p><strong>Sex:</strong> {{ sex }}</p>\n<p><strong>Civil Status:</strong> {{ civil_status }}</p>\n<p><strong>Address:</strong> {{ address }}</p>\n<p><strong>Barangay:</strong> {{ barangay }}</p>\n<p><strong>Purpose:</strong> {{ purpose }}</p>\n<p><strong>ID Presented:</strong> {{ id_presented }}</p>\n<p><strong>Contact Number:</strong> {{ contact_number }}</p>\n<p><strong>Release Date:</strong> {{ release_date }}</p>\n</div>";
     }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DocumentRequest;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class AdminReportController extends Controller
@@ -35,8 +36,8 @@ class AdminReportController extends Controller
         }
 
         $requests = $query->latest()->paginate(20)->withQueryString();
-        $serviceFees = $query->where('status', 'Approved')->sum('service_fee');
-        $totalRevenue = $query->sum('service_fee');
+        $serviceFees = (clone $query)->where('status', 'Approved')->sum('service_fee');
+        $totalRevenue = (clone $query)->where('status', 'Approved')->sum(DB::raw('COALESCE(base_price,0) + COALESCE(service_fee,0)'));
 
         return view('admin.reports.index', compact('requests', 'serviceFees', 'totalRevenue'));
     }

@@ -146,18 +146,28 @@ class DocumentRequestController extends Controller
         return view('documents.request.history', compact('requests'));
     }
 
-    // Admin: default Manage Requests (Pending only)
+
+    // Admin: default Manage Requests (all statuses)
     public function adminIndex()
     {
         $user = Auth::user();
-        $requests = DocumentRequest::forBarangay($user->barangay)
+        $pendingRequests = DocumentRequest::forBarangay($user->barangay)
             ->where('status', 'Pending')
             ->latest()
-            ->paginate(20);
+            ->paginate(10, ['*'], 'pending_page');
 
-        return view('admin.document_requests.index', compact('requests'));
+        $approvedRequests = DocumentRequest::forBarangay($user->barangay)
+            ->where('status', 'Approved')
+            ->latest()
+            ->paginate(10, ['*'], 'approved_page');
+
+        $rejectedRequests = DocumentRequest::forBarangay($user->barangay)
+            ->where('status', 'Rejected')
+            ->latest()
+            ->paginate(10, ['*'], 'rejected_page');
+
+        return view('admin.document_requests.index', compact('pendingRequests', 'approvedRequests', 'rejectedRequests'));
     }
-
     // ✅ Admin: filtered requests
     public function adminPending()
     {
@@ -292,12 +302,32 @@ class DocumentRequestController extends Controller
                 ->header('Content-Disposition', "attachment; filename=\"{$filename}.doc\"");
         }
 
+        if ($format === 'pdf') {
+            if (! class_exists('\\Dompdf\\Dompdf')) {
+                return back()->withErrors('PDF generation is not available. Please run `composer require barryvdh/laravel-dompdf` and publish vendor files.');
+            }
+
+            try {
+                $dompdf = new \Dompdf\Dompdf();
+                $dompdf->loadHtml($html);
+                $dompdf->setPaper('letter', 'portrait');
+                $dompdf->render();
+
+                return response($dompdf->output(), 200, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => "attachment; filename=\"{$filename}.pdf\"",
+                ]);
+            } catch (\Exception $e) {
+                return back()->withErrors('Failed to generate PDF: ' . $e->getMessage());
+            }
+        }
+
         return back()->withErrors('Unsupported format requested.');
     }
 
     protected function generateFinalDocumentHtml(DocumentRequest $documentRequest): string
     {
-        $template = $documentRequest->documentType?->template_html;
+        $template = $documentRequest->documentType?->effective_template_html;
         if (! $template) {
             $template = '<h1>' . e($documentRequest->document_type) . '</h1>' .
                 '<p><strong>Name:</strong> ' . e($documentRequest->fullname) . '</p>' .
